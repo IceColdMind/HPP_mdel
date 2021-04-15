@@ -8,7 +8,6 @@ using Base
 @everywhere Base.MainInclude.include("mapping_functions.jl")
 using Plots
 #using ProgressMeter
-#TODO: Transfer to Images package instead of built-in imfilter
 import Plots.@animate
 @everywhere using ImageFiltering
 
@@ -17,7 +16,6 @@ using Distributed
 
 #clibrary(:cmocean)
 
-#module GasLattice
 
 function GasLattice_visual(steps=50,startarr=0,randomize=true,dim=(1000,1000))
     randomize ? Grid=rand([1 2 3 5 6],dim) : Grid=startarr           #2:up 3:left 5:down 7:right 1:none

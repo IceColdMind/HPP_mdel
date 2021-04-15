@@ -1,8 +1,10 @@
 #This function computes the pressure.
-
-include(mapping_functions.jl)
+using Base
+@everywhere Base.MainInclude.include("mapping_functions.jl")
 include(pressure_functions.jl)
 
+@everywhere using Main.main_module
+using Distributed
 
 function GasLatticePressure(steps=20,startarr=0,randomize=true,dim=(100,100))
     randomize ? Grid=rand([1 2 3 5 7],dim) : Grid=startarr   
@@ -23,25 +25,26 @@ function GasLatticePressure(steps=20,startarr=0,randomize=true,dim=(100,100))
             iteration_pressure_array=[]  #Array for storing the number of collisions per step for an iteration.
             Grid=arraygenerator(number,dim)
             for k=1:steps
-                    Grid_top=map(hasbot,conv2(Grid,filtertop)[rang,rang])
-        
-                    Grid_left=map(hasright,conv2(Grid,filterleft)[rang,rang])
-                    Grid_bot=map(hastop,conv2(Grid,filterbot)[rang,rang])
-                    Grid_right=map(hasleft,conv2(Grid,filterright)[rang,rang])
-        
+
+                Grid_top=@spawnat 1 map(main_module.hasbot,imfilter(Grid,filtertop)[rang,rang])
+                Grid_left=@spawnat 2 map(main_module.hasright,imfilter(Grid,filterleft)[rang,rang])
+                Grid_bot=@spawnat 3 map(main_module.hastop,imfilter(Grid,filterbot)[rang,rang])
+                Grid_right=@spawnat 4 map(main_module.hasleft,imfilter(Grid,filterright)[rang,rang])
+
+       
+                Grid_post_filter=Grid_top .* Grid_left .* Grid_right .* Grid_bot
     
-                    Grid_post_filter=Grid_top .* Grid_left .* Grid_right .* Grid_bot
-                    Grid_pre_collision=mapzeroes(Grid,Grid_post_filter)
-                    Grid_pre_wall=map(collision,Grid_pre_collision)
+                Grid_pre_collision=mapzeroes(Grid,Grid_post_filter)
+                Grid_pre_wall=map(collision,Grid_pre_collision)
                 
                     #This is the function for calling the collisions per frame/step. It has to be called before
                     #the border collisions function.
-                    iteration_pressure_array=push!(iteration_pressure_array,countcollisions(Grid_pre_wall)) 
-                    Grid=map(bordercollisions,Grid_pre_wall)
+                iteration_pressure_array=push!(iteration_pressure_array,countcollisions(Grid_pre_wall)) 
+                Grid=map(bordercollisions,Grid_pre_wall)
                 
         
         
-            end
+                    end
             #The average of the collisions per step is taken.
             pressurearray=push!(pressurearray,average_of_array(iteration_pressure_array))
         end
